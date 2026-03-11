@@ -3716,6 +3716,16 @@ def _build_java_call_graph(
     workspace_config: Optional[WorkspaceConfig] = None
 ):
     """Build call graph for Java files."""
+    # Build a reverse index: function_name -> (file_path, full_key)
+    # This avoids O(N) linear scans of func_index for every call site
+    name_index: dict[str, list[tuple[str, tuple]]] = {}
+    for key, file_path in func_index.items():
+        if isinstance(key, tuple) and len(key) == 2:
+            _, name = key
+            if name not in name_index:
+                name_index[name] = []
+            name_index[name].append((file_path, key))
+
     for java_file in scan_project(root, "java", workspace_config):
         java_path = Path(java_file)
         rel_path = str(java_path.relative_to(root))
@@ -3751,29 +3761,16 @@ def _build_java_call_graph(
                     graph.add_edge(rel_path, caller_func, rel_path, call_target)
 
                 elif call_type == 'direct':
-                    # Direct call might be to a same-package class or an imported one
-                    # Try to find in function index
-                    for key, file_path in func_index.items():
-                        if isinstance(key, tuple) and len(key) == 2:
-                            mod, name = key
-                            if name == call_target:
-                                graph.add_edge(rel_path, caller_func, file_path, call_target)
-                                break
+                    if call_target in name_index:
+                        target_file, _ = name_index[call_target][0]
+                        graph.add_edge(rel_path, caller_func, target_file, call_target)
 
                 elif call_type == 'attr':
-                    # Object.method() call
                     if '.' in call_target:
-                        parts = call_target.split('.')
-                        obj_name = parts[0]
-                        method_name = parts[-1]
-
-                        # Try to find the method in the function index
-                        for key, file_path in func_index.items():
-                            if isinstance(key, tuple) and len(key) == 2:
-                                mod, name = key
-                                if name == method_name:
-                                    graph.add_edge(rel_path, caller_func, file_path, method_name)
-                                    break
+                        method_name = call_target.split('.')[-1]
+                        if method_name in name_index:
+                            target_file, _ = name_index[method_name][0]
+                            graph.add_edge(rel_path, caller_func, target_file, method_name)
 
 
 def _build_c_call_graph(
@@ -3783,6 +3780,14 @@ def _build_c_call_graph(
     workspace_config: Optional[WorkspaceConfig] = None
 ):
     """Build call graph for C files."""
+    name_index: dict[str, list[tuple[str, tuple]]] = {}
+    for key, file_path in func_index.items():
+        if isinstance(key, tuple) and len(key) == 2:
+            _, name = key
+            if name not in name_index:
+                name_index[name] = []
+            name_index[name].append((file_path, key))
+
     for c_file in scan_project(root, "c", workspace_config):
         c_path = Path(c_file)
         rel_path = str(c_path.relative_to(root))
@@ -3797,8 +3802,6 @@ def _build_c_call_graph(
         for inc in includes:
             module = inc['module']
             is_system = inc.get('is_system', False)
-            # Map the header file name to its path
-            # e.g., "utils.h" -> "utils.h"
             header_name = module.split('/')[-1] if '/' in module else module
             include_map[header_name] = module
 
@@ -3808,17 +3811,12 @@ def _build_c_call_graph(
         for caller_func, calls in calls_by_func.items():
             for call_type, call_target in calls:
                 if call_type == 'intra':
-                    # Intra-file call
                     graph.add_edge(rel_path, caller_func, rel_path, call_target)
 
                 elif call_type == 'direct':
-                    # Direct call - try to find in function index
-                    for key, file_path in func_index.items():
-                        if isinstance(key, tuple) and len(key) == 2:
-                            mod, name = key
-                            if name == call_target:
-                                graph.add_edge(rel_path, caller_func, file_path, call_target)
-                                break
+                    if call_target in name_index:
+                        target_file, _ = name_index[call_target][0]
+                        graph.add_edge(rel_path, caller_func, target_file, call_target)
 
 
 def _build_php_call_graph(
@@ -3828,6 +3826,14 @@ def _build_php_call_graph(
     workspace_config: Optional[WorkspaceConfig] = None
 ):
     """Build call graph for PHP files."""
+    name_index: dict[str, list[tuple[str, tuple]]] = {}
+    for key, file_path in func_index.items():
+        if isinstance(key, tuple) and len(key) == 2:
+            _, name = key
+            if name not in name_index:
+                name_index[name] = []
+            name_index[name].append((file_path, key))
+
     for php_file in scan_project(root, "php", workspace_config):
         php_path = Path(php_file)
         rel_path = str(php_path.relative_to(root))
@@ -3879,63 +3885,43 @@ def _build_php_call_graph(
                                 dst_file = func_index[key]
                                 graph.add_edge(rel_path, caller_func, dst_file, orig_name)
                     else:
-                        # Try to find directly in func_index
-                        for key, file_path in func_index.items():
-                            if isinstance(key, tuple) and len(key) == 2:
-                                _, name = key
-                                if name == call_target:
-                                    graph.add_edge(rel_path, caller_func, file_path, call_target)
-                                    break
+                        if call_target in name_index:
+                            target_file, _ = name_index[call_target][0]
+                            graph.add_edge(rel_path, caller_func, target_file, call_target)
 
                 elif call_type == 'static':
-                    # ClassName::staticMethod()
                     parts = call_target.split('::', 1)
                     if len(parts) == 2:
                         class_name, method = parts
-                        # Try to resolve class name via imports
                         if class_name in import_map:
                             namespace, resolved_class = import_map[class_name]
-                            # Look for Class::method in index
-                            for key, file_path in func_index.items():
-                                if isinstance(key, tuple) and len(key) == 2:
-                                    _, name = key
-                                    if name == method or name == f"{resolved_class}::{method}":
-                                        graph.add_edge(rel_path, caller_func, file_path, method)
-                                        break
+                            qualified = f"{resolved_class}::{method}"
+                            if method in name_index:
+                                target_file, _ = name_index[method][0]
+                                graph.add_edge(rel_path, caller_func, target_file, method)
+                            elif qualified in name_index:
+                                target_file, _ = name_index[qualified][0]
+                                graph.add_edge(rel_path, caller_func, target_file, method)
                         else:
-                            # Try direct lookup
                             key = (class_name, method)
                             if key in func_index:
                                 dst_file = func_index[key]
                                 graph.add_edge(rel_path, caller_func, dst_file, method)
-                            else:
-                                # Search in index
-                                for key, file_path in func_index.items():
-                                    if isinstance(key, tuple) and len(key) == 2:
-                                        _, name = key
-                                        if name == method:
-                                            graph.add_edge(rel_path, caller_func, file_path, method)
-                                            break
+                            elif method in name_index:
+                                target_file, _ = name_index[method][0]
+                                graph.add_edge(rel_path, caller_func, target_file, method)
 
                 elif call_type == 'attr':
-                    # $obj->method() - try to find method in index
                     parts = call_target.split('->', 1)
                     if len(parts) == 2:
                         obj, method = parts
-                        # For $this->method(), try to find method in same file first
                         if obj == "$this":
-                            # Check if method exists in current file's functions
-                            for key, file_path in func_index.items():
-                                if isinstance(key, tuple) and len(key) == 2:
-                                    _, name = key
-                                    if name == method and file_path == rel_path:
+                            if method in name_index:
+                                for target_file, _ in name_index[method]:
+                                    if target_file == rel_path:
                                         graph.add_edge(rel_path, caller_func, rel_path, method)
                                         break
                         else:
-                            # Generic object method call - try to find method
-                            for key, file_path in func_index.items():
-                                if isinstance(key, tuple) and len(key) == 2:
-                                    _, name = key
-                                    if name == method:
-                                        graph.add_edge(rel_path, caller_func, file_path, method)
-                                        break
+                            if method in name_index:
+                                target_file, _ = name_index[method][0]
+                                graph.add_edge(rel_path, caller_func, target_file, method)
