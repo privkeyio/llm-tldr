@@ -950,7 +950,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=21.0" },
     { name = "faiss-cpu", specifier = ">=1.13.2" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=3.8" },
-    { name = "mcp", specifier = ">=1.0.0" },
+    { name = "mcp", specifier = ">=1.0.0,<2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=0.900" },
     { name = "openai", marker = "extra == 'ai'", specifier = ">=1.0.0" },
     { name = "pathspec", specifier = ">=0.12.0" },
