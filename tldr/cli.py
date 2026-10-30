@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+from tldr._launch import python_module_argv
 from pathlib import Path
 
 # Fix for Windows: Explicitly import tree-sitter bindings early to prevent
@@ -880,7 +881,7 @@ Semantic Search:
             if args.background:
                 # Spawn background process (cross-platform)
                 subprocess.Popen(
-                    [sys.executable, "-m", "tldr.cli", "warm", str(project_path), "--lang", args.lang],
+                    python_module_argv("tldr.cli", "warm", str(project_path), "--lang", args.lang),
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     **_get_subprocess_detach_kwargs(),

@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from tldr._launch import python_module_argv
 from typing import Any, Optional
 
 from tldr.dedup import ContentHashedIndex
@@ -842,10 +843,7 @@ class TLDRDaemon:
                 import subprocess
 
                 # Run semantic index command
-                cmd = [
-                    sys.executable, "-m", "tldr.cli",
-                    "semantic", "index", str(self.project)
-                ]
+                cmd = python_module_argv("tldr.cli", "semantic", "index", str(self.project))
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
@@ -892,8 +890,14 @@ class TLDRDaemon:
         check_project = command.get("project", False)
         no_lint = command.get("no_lint", False)
 
-        target = str(self.project) if check_project else file_path
-        if not target:
+        if check_project:
+            target = str(self.project)
+        elif file_path:
+            resolved = (self.project / file_path).resolve()
+            if not resolved.is_relative_to(Path(self.project).resolve()):
+                return {"status": "error", "message": f"File is outside the project: {file_path}"}
+            target = str(resolved)
+        else:
             return {"status": "error", "message": "Missing required parameter: file or project"}
 
         errors = []

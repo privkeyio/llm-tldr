@@ -11,8 +11,8 @@ This module provides utilities to:
 import json
 import os
 import subprocess
-import sys
 import time
+from tldr._launch import python_module_argv
 from pathlib import Path
 from typing import Optional
 
@@ -241,16 +241,9 @@ def maybe_warm_background(
 
     # Spawn background process (cross-platform)
     subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "tldr.cli",
-            "warm",
-            str(project_path.resolve()),
-            "--background",
-            "--lang",
-            language,
-        ],
+        python_module_argv(
+            "tldr.cli", "warm", str(project_path.resolve()), "--background", "--lang", language
+        ),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         **_get_subprocess_detach_kwargs(),

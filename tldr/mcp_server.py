@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 import os
+from tldr._launch import python_module_argv
 
 from pathlib import Path
 
@@ -130,7 +131,7 @@ def _ensure_daemon(project: str, timeout: float = 10.0) -> None:
 
             # Start daemon
             subprocess.Popen(
-                [sys.executable, "-m", "tldr.cli", "daemon", "start", "--project", project],
+                python_module_argv("tldr.cli", "daemon", "start", "--project", project),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
