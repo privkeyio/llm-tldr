@@ -14,6 +14,7 @@ import socket
 import sys
 import tempfile
 import time
+from tldr._launch import python_module_argv
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, IO
@@ -314,7 +315,7 @@ def start_daemon(project_path: str | Path, foreground: bool = False):
                         startupinfo.wShowWindow = subprocess.SW_HIDE
 
                         proc = subprocess.Popen(
-                            [sys.executable, "-m", "tldr.daemon", str(project), "--foreground"],
+                            python_module_argv("tldr.daemon", str(project), "--foreground"),
                             startupinfo=startupinfo,
                             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW,
                             stdout=subprocess.DEVNULL,

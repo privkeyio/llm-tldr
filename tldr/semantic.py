@@ -189,6 +189,9 @@ def get_model(model_name: Optional[str] = None):
     # Get HuggingFace name
     if model_name in SUPPORTED_MODELS:
         hf_name = SUPPORTED_MODELS[model_name]["hf_name"]
+        if os.path.exists(hf_name):
+            # SentenceTransformer prefers a local directory over the Hub id.
+            raise ValueError(f"Refusing to load {hf_name}: a local path with that name shadows the model")
     else:
         # Allow arbitrary HuggingFace model names
         hf_name = model_name
@@ -1138,6 +1141,9 @@ def semantic_search(
     # Use model from metadata if not specified (ensures matching embeddings)
     index_model = metadata.get("model")
     if model is None and index_model:
+        known = set(SUPPORTED_MODELS) | {m["hf_name"] for m in SUPPORTED_MODELS.values()}
+        if index_model not in known:
+            raise ValueError(f"Index uses unsupported model {index_model!r}. Rebuild it, or pass --model to use it anyway.")
         model = index_model
 
     # Embed query (with instruction prefix for BGE)

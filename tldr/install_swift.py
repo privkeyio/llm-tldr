@@ -13,6 +13,7 @@ macOS ARM64, or provides instructions for other platforms.
 import platform
 import subprocess
 import sys
+from tldr._launch import python_module_argv
 from pathlib import Path
 
 
@@ -47,14 +48,7 @@ def install_swift():
             )
             if result.returncode != 0:
                 result = subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "pip",
-                        "install",
-                        "--force-reinstall",
-                        str(wheel),
-                    ],
+                    python_module_argv("pip", "install", "--force-reinstall", str(wheel)),
                     capture_output=True,
                     text=True,
                 )
